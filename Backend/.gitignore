@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+
+# dotenv
+.env
+.env.*
+
+# build output
+dist/
+build/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+*.log
+
+# runtime
+pids/
+*.pid
+
+# coverage
+coverage/
+
+# editor
+.vscode/
+.idea/
+
+# misc
+.DS_Store
+*.tgz
