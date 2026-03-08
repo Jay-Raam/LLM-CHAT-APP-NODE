@@ -1,0 +1,5 @@
+{
+  "name": "Nexus AI Chat",
+  "description": "A production-grade AI Chatbot SaaS dashboard with streaming responses and JWT authentication.",
+  "requestFramePermissions": []
+}
