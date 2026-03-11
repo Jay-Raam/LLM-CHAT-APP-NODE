@@ -12,6 +12,7 @@ import {
 import { askAI } from '../api/ai';
 import { createChatMessage, getSessionMessages, getSessions } from '../api/chat';
 import { getNewsSuggestions } from '../api/news';
+import VoiceChat from '../components/VoiceChat';
 import { io } from 'socket.io-client';
 import { Send, Bot, User, Loader2, Sparkles, AlertCircle, Coins } from 'lucide-react';
 import { Message } from '../types';
@@ -207,20 +208,18 @@ export default function Dashboard() {
         return () => window.clearInterval(intervalId);
     }, [showTypingPreview, pendingPrompt]);
 
-    const handleSendMessage = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const text = input.trim();
-        if (!text || streaming) return;
+    const sendPrompt = async (text: string) => {
+        const normalizedText = text.trim();
+        if (!normalizedText || streaming) return '';
 
-        setInput('');
         dispatch(setStreaming(true));
         dispatch(setError(null));
         typingPreviewActiveRef.current = true;
-        setPendingPrompt(text);
+        setPendingPrompt(normalizedText);
         setShowTypingPreview(true);
 
         try {
-            const saved = await createChatMessage({ sessionId: activeSessionId, text });
+            const saved = await createChatMessage({ sessionId: activeSessionId, text: normalizedText });
             if (saved?.message) {
                 dispatch(
                     addMessage({
@@ -239,7 +238,7 @@ export default function Dashboard() {
                 await loadSessions();
             }
 
-            const aiResponse = await askAI(text, resolvedSessionId || undefined);
+            const aiResponse = await askAI(normalizedText, resolvedSessionId || undefined);
             const content =
                 aiResponse?.data?.content ||
                 aiResponse?.data?.rawSecond?.choices?.[0]?.message?.content ||
@@ -261,6 +260,8 @@ export default function Dashboard() {
                 setTypingPreviewText('');
                 setPendingPrompt('');
             }
+
+            return content;
         } catch (err: any) {
             dispatch(setError('Something went wrong. Please try again.'));
             typingPreviewActiveRef.current = false;
@@ -268,9 +269,19 @@ export default function Dashboard() {
             setTypingPreviewText('');
             setPendingPrompt('');
             console.error(err);
+            return '';
         } finally {
             dispatch(setStreaming(false));
         }
+    };
+
+    const handleSendMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const text = input.trim();
+        if (!text || streaming) return;
+
+        setInput('');
+        await sendPrompt(text);
     };
 
     return (
@@ -298,7 +309,7 @@ export default function Dashboard() {
                             className="flex flex-col items-center justify-center min-h-[60vh] sm:h-full text-center max-w-2xl mx-auto px-2"
                         >
                             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-indigo-600/10 flex items-center justify-center mb-5 sm:mb-6">
-                                 <Sparkles className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-500" />
+                                <Sparkles className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-500" />
                             </div>
                             <h2 className="text-xl sm:text-2xl font-bold text-white mb-3">How can I help you today?</h2>
                             <p className="text-zinc-400 text-sm sm:text-lg leading-relaxed">
@@ -406,27 +417,30 @@ export default function Dashboard() {
                             onChange={(e) => setInput(e.target.value)}
                             placeholder="Message Nexus AI..."
                             disabled={streaming}
-                            className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl sm:rounded-2xl py-3 sm:py-4 pl-4 sm:pl-6 pr-24 sm:pr-28 text-sm sm:text-base text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all disabled:opacity-50 shadow-2xl"
+                            className="w-full bg-[#1A1A1A] border border-white/10 rounded-xl sm:rounded-2xl py-3 sm:py-4 pl-4 sm:pl-6 pr-40 sm:pr-44 text-sm sm:text-base text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all disabled:opacity-50 shadow-2xl"
                         />
-                        <div className="absolute right-12 sm:right-14 top-1/2 -translate-y-1/2 group">
-                            <button
-                                type="button"
-                                className="p-2 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors"
-                                aria-label="Session token usage"
-                            >
-                                <Coins className="w-4 h-4" />
-                            </button>
-                            <div className="pointer-events-none absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-lg border border-white/10 bg-zinc-900/95 px-3 py-2 text-xs text-zinc-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                                {sessionTokenEstimate.toLocaleString()} tokens used in this session (approx)
+                        <div className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 sm:gap-2">
+                            <div className="relative group">
+                                <button
+                                    type="button"
+                                    className="p-2 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors"
+                                    aria-label="Session token usage"
+                                >
+                                    <Coins className="w-4 h-4" />
+                                </button>
+                                <div className="pointer-events-none absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-lg border border-white/10 bg-zinc-900/95 px-3 py-2 text-xs text-zinc-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                                    {sessionTokenEstimate.toLocaleString()} tokens used in this session (approx)
+                                </div>
                             </div>
+                            <VoiceChat onSendMessage={sendPrompt} disabled={streaming} variant="icon" />
+                            <button
+                                type="submit"
+                                disabled={!input.trim() || streaming}
+                                className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 disabled:bg-zinc-800 transition-all"
+                            >
+                                {streaming ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                            </button>
                         </div>
-                        <button
-                            type="submit"
-                            disabled={!input.trim() || streaming}
-                            className="absolute right-2 sm:right-3 p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 disabled:bg-zinc-800 transition-all"
-                        >
-                            {streaming ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-                        </button>
                     </form>
                     <p className="hidden sm:block mt-3 text-center text-[10px] text-zinc-600 uppercase tracking-widest font-medium">
                         Nexus AI can make mistakes. Check important info.
