@@ -10,6 +10,7 @@ const {
   aiRoutes,
   chatRoutes,
   protectedRoutes,
+  newsRoutes,
 } = require("./routes");
 
 const app = express();
@@ -101,6 +102,8 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/ai", aiRoutes);
 app.use("/api/v1/chat", chatRoutes);
 app.use("/api/v1/protected", protectedRoutes);
+app.use("/api/v1/news", newsRoutes);
+app.use("/api/news", newsRoutes);
 
 /*
 |--------------------------------------------------------------------------

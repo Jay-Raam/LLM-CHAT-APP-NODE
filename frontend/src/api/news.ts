@@ -2,57 +2,27 @@ export interface NewsSuggestionItem {
   title: string;
 }
 
-interface NewsDataResponse {
-  results?: Array<{
-    title?: string;
-    description?: string;
-  }>;
-}
-
-const NEWSDATA_URL = 'https://newsdata.io/api/1/latest';
-
-const DEFAULT_COUNTRIES = 'in,cn,au,wo';
-const DEFAULT_LANGUAGES = 'ta,en,ml';
-const DEFAULT_CATEGORIES = 'technology,education,food,health,lifestyle';
-
-function toPromptTitle(raw: string) {
-  const cleaned = raw.replace(/\s+/g, ' ').trim();
-  if (!cleaned) return '';
-  return cleaned.length > 90 ? `${cleaned.slice(0, 90)}...` : cleaned;
-}
+const FALLBACK_SUGGESTIONS: NewsSuggestionItem[] = [
+  { title: 'Explain quantum computing in simple terms' },
+  { title: 'Compare microservices vs modular monoliths' },
+  { title: 'Recent breakthroughs in renewable energy technology' },
+  { title: 'Best practices for securing Node.js APIs in production' },
+];
 
 export async function getNewsSuggestions(limit = 4): Promise<NewsSuggestionItem[]> {
-  const apiKey = (import.meta as any).env?.VITE_NEWSDATA_API_KEY;
-  if (!apiKey) {
-    throw new Error('Missing VITE_NEWSDATA_API_KEY');
+  try {
+    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || '';
+    const res = await fetch(`${apiBase}/api/v1/news/suggestions`);
+    if (!res.ok) {
+      return FALLBACK_SUGGESTIONS.slice(0, limit);
+    }
+    const data = await res.json();
+    if (Array.isArray(data.suggestions) && data.suggestions.length > 0) {
+      return data.suggestions.slice(0, limit);
+    }
+    return FALLBACK_SUGGESTIONS.slice(0, limit);
+  } catch (error) {
+    console.warn('Backend news proxy unavailable, using fallback suggestions');
+    return FALLBACK_SUGGESTIONS.slice(0, limit);
   }
-
-  const params = new URLSearchParams({
-    apikey: apiKey,
-    country: DEFAULT_COUNTRIES,
-    language: DEFAULT_LANGUAGES,
-    category: DEFAULT_CATEGORIES,
-  });
-
-  const res = await fetch(`${NEWSDATA_URL}?${params.toString()}`);
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`NewsData error: ${res.status} ${text}`);
-  }
-
-  const data = (await res.json()) as NewsDataResponse;
-  const seen = new Set<string>();
-  const suggestions: NewsSuggestionItem[] = [];
-
-  for (const row of data.results || []) {
-    const candidate = toPromptTitle(row.title || row.description || '');
-    if (!candidate) continue;
-    const key = candidate.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    suggestions.push({ title: candidate });
-    if (suggestions.length >= limit) break;
-  }
-
-  return suggestions;
 }
